@@ -15,7 +15,7 @@ try:
     AUDIO_ENABLED = True
 except Exception:
     AUDIO_ENABLED = False
-    print("[yellow]Audio initialization failed. Sound effects will be disabled.[/yellow]")
+    console.print("[yellow]Audio initialization failed. Sound effects will be disabled.[/yellow]")
 
 # --- Global configuration ---
 statnames = ["Brains", "Feet", "Arms", "Wand", "Beard"]
@@ -25,28 +25,40 @@ Sound_Effects = {
     "Victory": "Sounds/Victory!.wav",
     "Music": "Sounds/Magic Music - A Wizards Dream (Beautiful Violin).mp3",
     "fail": "Sounds/fail.wav",
-    "Success":"Sounds/magical_4.ogg",
+    "Success": "Sounds/magical_4.ogg",
     "MagicPolly": "Sounds/magical_1.ogg",
     "Coin": "Sounds/coin.wav",
 }
+
 SOUNDS = {}
 if AUDIO_ENABLED:
     for name, path in Sound_Effects.items():
+        if name == "Music":
+            continue  # La música de fondo se carga con mixer.music
         if os.path.exists(path):
-            snd = mixer.Sound(path)
-            snd.set_volume(0.5)  # Volumen entre 0.0 y 1.0
-            SOUNDS[name] = snd
-        else: 
-            print(f"[yellow]Sound file '{path}' not found. '{name}' sound will be disabled.[/yellow]")
+            try:
+                snd = mixer.Sound(path)
+                snd.set_volume(0.5)
+                SOUNDS[name] = snd
+            except Exception:
+                console.print(f"[yellow]Could not decode '{path}'. '{name}' disabled.[/yellow]")
+        else:
+            console.print(f"[yellow]Sound file '{path}' not found. '{name}' sound will be disabled.[/yellow]")
+
 
 def Playsound(name):
     if AUDIO_ENABLED and name in SOUNDS:
         SOUNDS[name].play()
+
+
 if AUDIO_ENABLED and "Music" in Sound_Effects and os.path.exists(Sound_Effects["Music"]):
-    mixer.music.load(Sound_Effects["Music"])
-    mixer.music.set_volume(0.25) 
-    mixer.music.play(-1)
-    
+    try:
+        mixer.music.load(Sound_Effects["Music"])
+        mixer.music.set_volume(0.25)
+        mixer.music.play(-1)
+    except Exception:
+        pass
+
 EXAM_MILESTONES = [(14, 3), (28, 4), (42, 6), (56, 7), (70, 10)]
 
 ARTIFACTS_INFO = {
@@ -143,6 +155,7 @@ def diceRoll(stats, inventory):
         if ans == "y":
             inventory.remove("Misterious pill")
             n = random.randint(1, 6)
+            Playsound("dice")
             sPrint(f"You swallowed the pill! Your new roll is [bold green]{n}[/bold green]")
 
     luck = Luckboost(stats)
@@ -164,10 +177,10 @@ def end():
     console.print(Panel(content, border_style="gold1", expand=False))
 
 
-# --- INTERFAZ: TABLERO, STATS E INVENTARIO ---
+# --- INTERFAZ: TABLERO, STATS, TIENDA E INVENTARIO ---
 
-def display_Stats(stats, statnames, inventory):
-    table = Table(title="Current Stats & Backpack", style="white", header_style="bold cyan")
+def display_Stats(stats, statnames, inventory, coins):
+    table = Table(title=f"Current Stats  |  [bold gold1]Coins: {coins}[/bold gold1]", style="white", header_style="bold cyan")
     table.add_column("Stat", justify="left")
     table.add_column("Value", justify="right", style="bold blue")
     for name, val in zip(statnames, stats):
@@ -178,7 +191,7 @@ def display_Stats(stats, statnames, inventory):
         inv_lines = [f"• [bold green]{item}[/bold green]: {ARTIFACTS_INFO[item]}" for item in inventory]
         inv_text = "\n".join(inv_lines)
     else:
-        inv_text = "[dim]Your backpack is empty. Land on [ R ] tiles to find artifacts![/dim]"
+        inv_text = "[dim]Your backpack is empty. Land on [ R ] tiles or visit the Store![/dim]"
 
     console.print(Panel(inv_text, title=f"Backpack ({len(inventory)}/{MAX_INVENTORY})", border_style="green", expand=False))
 
@@ -188,6 +201,64 @@ def get_tile_type(pos):
         if pos in spaces:
             return t_type
     return "."
+
+
+def store(coins, inventory):
+    """Allows the player to spend coins on random or specific artifacts."""
+    if len(inventory) >= MAX_INVENTORY:
+        sPrint("[bold red]Your backpack is full mate![/bold red]")
+        return coins
+
+    if coins < 5:
+        sPrint(f"[bold red]You only have {coins} coins! You need at least 5 coins to shop.[/bold red]")
+        return coins
+
+    sPrint(f"[bold cyan]Welcome to the Magic Store! (Your Coins: [gold1]{coins}[/gold1])[/bold cyan]")
+    r = input(
+        "  <1> Mystery Box: Random artifact (5 coins — 25% chance it's empty!)\n"
+        "  <2> Specific Artifact: Choose exact item (15 coins)\n"
+        "  <3> Leave store\n> "
+    ).strip()
+
+    match r:
+        case "1":
+            coins -= 5
+            if random.randint(0, 3) != 0:
+                bought_item = random.choice(list(ARTIFACTS_INFO.keys()))
+                inventory.append(bought_item)
+                Playsound("Coin")
+                sPrint(f"[bold green]Nice! You got a {bought_item}![/bold green]")
+            else:
+                Playsound("fail")
+                sPrint("[bold red]Whoops, the mystery box was empty! Bad luck![/bold red]")
+
+        case "2":
+            if coins < 15:
+                sPrint("[bold red]Not enough coins! You need 15 coins.[/bold red]")
+                return coins
+
+            items_list = list(ARTIFACTS_INFO.keys())
+            sPrint("Choose an item to buy:")
+            for idx, key in enumerate(items_list, start=1):
+                sPrint(f"  <{idx}> {key}: {ARTIFACTS_INFO[key]}")
+
+            choice = input("> ").strip()
+            if choice.isdigit() and 1 <= int(choice) <= len(items_list):
+                bought_item = items_list[int(choice) - 1]
+                coins -= 15
+                inventory.append(bought_item)
+                Playsound("Coin")
+                sPrint(f"[bold green]Purchased {bought_item} for 15 coins![/bold green]")
+            else:
+                sPrint("[red]Invalid item selection. Purchase cancelled.[/red]")
+
+        case "3":
+            sPrint("See you next time!")
+
+        case _:
+            sPrint("[red]Not a valid option.[/red]")
+
+    return coins
 
 
 def display_board(player_pos):
@@ -241,14 +312,14 @@ def use_item_action(stats, inventory):
 
 # --- EVENTOS CON TOMA DE DECISIONES Y MINIJUEGO ---
 
-def lecture(stats):
-    """Event: Safe notes (+1) or risky spell minigame (+3 / -2)."""
+def lecture(stats, coins):
+    """Event: Safe notes (+1 stat, +1 coin) or risky spell minigame (+3 stat, +4 coins / -2 stat)."""
     sPrint("[cyan]You fell in a Lecture square![/cyan]")
     sPrint("The professor is demonstrating a tricky incantation. How do you act?")
     while True:
         choice = input(
-            "  <1> Option A (Safe): Take quiet notes (+1 guaranteed to a random stat)\n"
-            "  <2> Option B (Risky): Cast the advanced spell (Reflex Minigame -> +3, else -2)\n> "
+            "  <1> Option A (Safe): Take quiet notes (+1 stat, +1 coin)\n"
+            "  <2> Option B (Risky): Cast the advanced spell (Reflex Minigame -> +3 stat & +4 coins, else -2)\n> "
         ).strip()
         if choice in ("1", "2"):
             break
@@ -257,21 +328,24 @@ def lecture(stats):
     x = random.randint(0, 4)
     if choice == "1":
         stats[x] += 1
-        sPrint(f"[green]Steady progress! Taking notes improved your {statnames[x]} to {stats[x]}.[/green]")
+        coins += 1
+        Playsound("Coin")
+        sPrint(f"[green]Steady progress! Your {statnames[x]} improved to {stats[x]} (+1 coin).[/green]")
     else:
-        sPrint(f"[cyan]Brains bonus grants extra casting time (+{stats[0] * 0.35:.2f}s)![/cyan]")
-        if spell_minigame(length=4, base_time=2.3, stat_bonus=stats[0]):
-            target = random.choice([0, 3])  # Brains o Wand
+        sPrint(f"[cyan]Brains bonus grants extra casting time (+{stats[0] * 0.1:.2f}s)![/cyan]")
+        if spell_minigame(length=4, base_time=2.0, stat_bonus=stats[0]):
+            target = random.choice([0, 3])
             stats[target] += 3
-            Playsound("Success")
-            sPrint(f"[bold green]Brilliant! The professor is impressed: +3 {statnames[target]} (now {stats[target]})![/bold green]")
+            coins += 4
+            sPrint(f"[bold green]Brilliant! +3 {statnames[target]} (now {stats[target]}) and +4 coins![/bold green]")
         else:
             stats[x] = max(0, stats[x] - 2)
             Playsound("fail")
             sPrint(f"[bold red]The spell fizzled! You lost -2 {statnames[x]} (now {stats[x]}).[/bold red]")
+    return coins
 
 
-def accident(stats, inventory):
+def accident(stats, inventory, coins):
     """Event: Dodge with Feet check, cast a shield via reflex minigame, or use Talking gloves."""
     sPrint("[bold red]You fell in an Accident square! A potion cauldron is about to explode![/bold red]")
 
@@ -280,9 +354,10 @@ def accident(stats, inventory):
         if ans == "y":
             inventory.remove("Talking gloves")
             stats[3] += 1
+            coins += 3
             Playsound("Success")
-            sPrint(f"[bold green]The gloves cast a shield! You avoided damage and your Wand rose to {stats[3]}![/bold green]")
-            return
+            sPrint(f"[bold green]The gloves cast a shield! Wand rose to {stats[3]} (+3 coins)![/bold green]")
+            return coins
 
     while True:
         choice = input(
@@ -300,27 +375,29 @@ def accident(stats, inventory):
         if score >= 5:
             gain = random.randint(1, 2)
             stats[1] += gain
+            coins += 3
             Playsound("Success")
-            sPrint(f"[green]Close call! You dodged it and gained +{gain} Feet (now {stats[1]})![/green]")
+            sPrint(f"[green]Close call! You dodged it: +{gain} Feet (now {stats[1]}) and +3 coins![/green]")
         else:
             loss = random.randint(1, 2)
             stats[1] = max(0, stats[1] - loss)
             Playsound("fail")
             sPrint(f"[red]Boom! You tripped and lost -{loss} Feet (now {stats[1]}).[/red]")
     else:
-        sPrint(f"[cyan]Wand bonus grants extra barrier time (+{stats[3] * 0.35:.2f}s)![/cyan]")
-        if spell_minigame(length=5, base_time=2.5, stat_bonus=stats[3]):
+        sPrint(f"[cyan]Wand bonus grants extra barrier time (+{stats[3] * 0.1:.2f}s)![/cyan]")
+        if spell_minigame(length=5, base_time=2.2, stat_bonus=stats[3]):
             stats[3] += 2
-            Playsound("Success")
-            sPrint(f"[bold green]Barrier held! You absorbed the magic: +2 Wand (now {stats[3]})![/bold green]")
+            coins += 3
+            sPrint(f"[bold green]Barrier held! +2 Wand (now {stats[3]}) and +3 coins![/bold green]")
         else:
             loss = random.randint(1, 2)
             stats[3] = max(0, stats[3] - loss)
             Playsound("fail")
             sPrint(f"[bold red]Your barrier shattered! You lost -{loss} Wand (now {stats[3]}).[/bold red]")
+    return coins
 
 
-def Shenaningan(stats, inventory):
+def Shenaningan(stats, inventory, coins):
     """Event: Counter classmates' pranks using Arms, Brains, or Talking gloves."""
     sPrint("[magenta]You fell in a Shenanigan square! Classmates set a magical trap for you![/magenta]")
 
@@ -329,8 +406,10 @@ def Shenaningan(stats, inventory):
         if ans == "y":
             inventory.remove("Talking gloves")
             stats[3] += 1
-            sPrint(f"[bold green]The gloves warned you in time! Your Wand rose to {stats[3]}![/bold green]")
-            return
+            coins += 3
+            Playsound("Success")
+            sPrint(f"[bold green]The gloves warned you in time! Wand rose to {stats[3]} (+3 coins)![/bold green]")
+            return coins
 
     while True:
         choice = input(
@@ -348,14 +427,16 @@ def Shenaningan(stats, inventory):
 
     if score >= 5:
         stats[stat_idx] += 1
+        coins += 3
         Playsound("Success")
-        sPrint(f"[green]You turned the tables on them! +1 {statnames[stat_idx]} (now {stats[stat_idx]}).[/green]")
+        sPrint(f"[green]You turned the tables on them! +1 {statnames[stat_idx]} (now {stats[stat_idx]}) and +3 coins![/green]")
     else:
         loss = random.randint(1, 2)
         x = random.randint(0, 4)
         stats[x] = max(0, stats[x] - loss)
         Playsound("fail")
         sPrint(f"[red]Pranked! You lost -{loss} {statnames[x]} (now {stats[x]}).[/red]")
+    return coins
 
 
 def artifact(stats, inventory):
@@ -379,18 +460,20 @@ def artifact(stats, inventory):
                 drop_idx = int(input("Choose item number to replace: ")) - 1
                 if 0 <= drop_idx < len(inventory):
                     dropped = inventory.pop(drop_idx)
-                    inventory.append(found_item)
+                    inventory.append(found_item)  # <-- Corregido
                     sPrint(f"Dropped {dropped} and equipped [green]{found_item}[/green].")
             except ValueError:
                 sPrint("Invalid input. You left the chest behind.")
 
 
-def Magicpolly(stats):
-    """Event: Increases ALL player stats by +1."""
+def Magicpolly(stats, coins):
+    """Event: Increases ALL player stats by +1 and grants +5 coins."""
     Playsound("MagicPolly")
     for i in range(len(stats)):
         stats[i] += 1
-    sPrint("[bold gold1]Wow! You arrived at MagicPolly fountain! All of your stats increased by +1![/bold gold1]")
+    coins += 5
+    sPrint("[bold gold1]Wow! You arrived at MagicPolly fountain! All stats +1 and +5 coins![/bold gold1]")
+    return coins
 
 
 # --- CHECKPOINTS & MECÁNICAS ---
@@ -417,9 +500,8 @@ def Exam(difficulty, stats, inventory):
             exam_bonus += 2
             sPrint(f"[yellow]You drank 4 espressos! Feet dropped to {stats[1]}, +2 Exam Bonus.[/yellow]")
 
-    # Prueba práctica con el minijuego de reflejos
     sPrint("\n[bold magenta]Part 1: Practical Wand Demonstration![/bold magenta]")
-    if spell_minigame(length=5, base_time=2.6, stat_bonus=stats[3]):
+    if spell_minigame(length=5, base_time=2.3, stat_bonus=stats[3]):
         exam_bonus += 2
         sPrint("[bold green]Examiners loved your technique! (+2 Practical Bonus)[/bold green]")
     else:
@@ -430,11 +512,12 @@ def Exam(difficulty, stats, inventory):
     sPrint(f"\nFinal Results -> Brains: [bold]{brains_score}[/bold]/{difficulty} | {statnames[n]}: [bold]{second_score}[/bold]/{difficulty}")
 
     if brains_score >= difficulty and second_score >= difficulty:
-        sPrint("[bold green]You passed your exam![/bold green]")
+        sPrint("[bold green]You passed your exam! (+10 coins)[/bold green]")
         Playsound("Success")
         return 1
     else:
-        sPrint("[bold red]You failed your exam...[/bold red]")
+        stats[n] = stats[n] + 1 if stats[n] < 6 else stats[n]
+        sPrint(f"[bold red]You failed your exam...[/bold red] but your [bold cyan]{statnames[n]}[/bold cyan] increased by +1 for next time (now {stats[n]}).")
         Playsound("fail")
         return 0
 
@@ -447,7 +530,7 @@ def Position(current, stats, inventory):
     return min(target, 70)
 
 
-def box(current, stats, inventory):
+def box(current, stats, inventory, coins):
     current = Position(current, stats, inventory)
     display_board(current)
 
@@ -457,31 +540,33 @@ def box(current, stats, inventory):
             current = max(0, current - 5)
             stats[0] += 1
             sPrint(f"You were sent back to tile {current}, but learned from your mistakes (+1 Brains -> {stats[0]}).")
-        return current
+        else:
+            coins += 10
+        return current, coins
 
     tile_type = get_tile_type(current)
     if tile_type == "C":
-        lecture(stats)
+        coins = lecture(stats, coins)
     elif tile_type == "A":
-        accident(stats, inventory)
+        coins = accident(stats, inventory, coins)
     elif tile_type == "S":
-        Shenaningan(stats, inventory)
+        coins = Shenaningan(stats, inventory, coins)
     elif tile_type == "R":
         artifact(stats, inventory)
     elif tile_type == "M":
-        Magicpolly(stats)
+        coins = Magicpolly(stats, coins)
 
-    return current
+    return current, coins
 
 
-def Turn(Pos, name, stats, inventory):
+def Turn(Pos, name, stats, inventory, coins):
     sPrint(f"\n>>>>> Start of your turn: {name}")
-    return box(Pos, stats, inventory)
+    return box(Pos, stats, inventory, coins)
 
 
 # --- GUARDADO, CARGA Y MENÚS ---
 
-def save_game(filename, currentP, stats, name, inventory):
+def save_game(filename, currentP, stats, name, inventory, coins):
     if not filename:
         sPrint("[red]Invalid file name! Game was not saved.[/red]")
         return False
@@ -491,6 +576,7 @@ def save_game(filename, currentP, stats, name, inventory):
             f.write(','.join(map(str, stats)) + '\n')
             f.write(f"{name}\n")
             f.write(','.join(inventory) + '\n')
+            f.write(f"{coins}\n")
         return True
     except OSError:
         sPrint("[red]Could not save file. Check the file name or permissions.[/red]")
@@ -501,7 +587,7 @@ def load_game(filename):
     if not filename or not os.path.exists(filename):
         sPrint("[red]Save file does not exist! Starting a new game instead.[/red]")
         name = input("Insert user's name: ").strip() or "Mago"
-        return 0, setup(), name, []
+        return 0, setup(), name, [], 5
 
     try:
         with open(filename, 'r') as f:
@@ -510,17 +596,19 @@ def load_game(filename):
             name = f.readline().strip() or "Mago"
             inv_line = f.readline().strip()
             inventory = [item for item in inv_line.split(',') if item in ARTIFACTS_INFO] if inv_line else []
+            coins_line = f.readline().strip()
+            coins = int(coins_line) if coins_line else 0
 
         if len(stats) != 5 or not (0 <= currentP <= 70):
             raise ValueError("Invalid save structure")
-        return currentP, stats, name, inventory
+        return currentP, stats, name, inventory, coins
     except (ValueError, IndexError, OSError):
         sPrint("[red]Corrupted save file! Starting a new game instead.[/red]")
         name = input("Insert user's name: ").strip() or "Mago"
-        return 0, setup(), name, []
+        return 0, setup(), name, [], 5
 
 
-def menu(currentP, stats, name, inventory):
+def menu(currentP, stats, name, inventory, coins):
     a = input(
         "\nPress <1> to continue playing"
         "\nPress <2> to load a previous save"
@@ -531,35 +619,35 @@ def menu(currentP, stats, name, inventory):
 
     match a:
         case "1":
-            return currentP, stats, name, inventory
+            return currentP, stats, name, inventory, coins
         case "2":
             file = input("Enter the save file name: ").strip()
-            currentP, stats, name, inventory = load_game(file)
+            currentP, stats, name, inventory, coins = load_game(file)
             display_board(currentP)
-            display_Stats(stats, statnames, inventory)
-            return currentP, stats, name, inventory
+            display_Stats(stats, statnames, inventory, coins)
+            return currentP, stats, name, inventory, coins
         case "3":
             file = input("Enter the file name to save the game: ").strip()
-            if save_game(file, currentP, stats, name, inventory):
+            if save_game(file, currentP, stats, name, inventory, coins):
                 sPrint(f"[green]Game saved to {file}[/green]")
-            return currentP, stats, name, inventory
+            return currentP, stats, name, inventory, coins
         case "4":
             rules_text = (
                 "• Roll the dice to advance across 70 tiles.\n"
                 "• Choose safe or risky actions in Lectures, Accidents, and Shenanigans.\n"
+                "• Earn Coins from events and exams to buy Artifacts in the Magic Store.\n"
                 "• Cast spells fast in reflex minigames to earn bonus points.\n"
-                "• Collect Artifacts on [R] tiles to use passively or during tough checks.\n"
                 "• Pass all 5 Exams (tiles 14, 28, 42, 56, 70) to graduate!"
             )
             console.print(Panel(rules_text, title="MagicPolly Rules", border_style="yellow", expand=False))
-            return currentP, stats, name, inventory
+            return currentP, stats, name, inventory, coins
         case "5":
             sPrint("[bold red]Exiting the game...[/bold red]")
             sPrint("Goodbye!")
             sys.exit()
         case _:
             sPrint("[red]Invalid option! Please choose a valid option.[/red]")
-            return currentP, stats, name, inventory
+            return currentP, stats, name, inventory, coins
 
 
 def main():
@@ -578,13 +666,14 @@ def main():
                 name = input("Insert user's name: ").strip() or "Mago"
                 stats = setup()
                 inventory = []
+                coins = 5  # Monedas iniciales para poder probar la tienda
                 break
             case "2":
                 file = input("Enter the save file name: ").strip()
-                currentP, stats, name, inventory = load_game(file)
+                currentP, stats, name, inventory, coins = load_game(file)
                 break
             case "3":
-                sPrint("[yellow]Roll the dice, choose how to handle events, cast spells in reflex challenges, and pass the exams at tiles 14, 28, 42, 56, and 70![/yellow]")
+                sPrint("[yellow]Roll the dice, earn coins in events, buy artifacts in the store, and pass the exams at tiles 14, 28, 42, 56, and 70![/yellow]")
             case "4":
                 sPrint("[bold red]Exiting the game...[/bold red]")
                 sPrint("Goodbye!")
@@ -596,24 +685,28 @@ def main():
     console.print(f"[bold cyan]{title_banner}[/bold cyan]")
 
     display_board(currentP)
-    display_Stats(stats, statnames, inventory)
+    display_Stats(stats, statnames, inventory, coins)
 
     while currentP < 70:
         choice = input(
             "\nPress <1> to roll dice & start turn"
             "\nPress <2> to use an item from backpack"
-            "\nPress <3> to access the menu\n> "
+            "\nPress <3> to visit the Magic Store"
+            "\nPress <4> to access the menu\n> "
         ).strip()
 
         match choice:
             case "1":
-                currentP = Turn(currentP, name, stats, inventory)
-                display_Stats(stats, statnames, inventory)
+                currentP, coins = Turn(currentP, name, stats, inventory, coins)
+                display_Stats(stats, statnames, inventory, coins)
             case "2":
                 use_item_action(stats, inventory)
-                display_Stats(stats, statnames, inventory)
+                display_Stats(stats, statnames, inventory, coins)
             case "3":
-                currentP, stats, name, inventory = menu(currentP, stats, name, inventory)
+                coins = store(coins, inventory)
+                display_Stats(stats, statnames, inventory, coins)
+            case "4":
+                currentP, stats, name, inventory, coins = menu(currentP, stats, name, inventory, coins)
             case _:
                 sPrint("[red]Invalid option! Please choose a valid option.[/red]")
 
