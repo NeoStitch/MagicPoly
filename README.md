@@ -10,7 +10,7 @@ This game uses structural pattern matching (`match / case`), which requires **Py
 
 ### 1. Check Your Current Python Version
 Open your terminal or command prompt and run:
-```bash
+```
 python --version
 # or on macOS/Linux:
 python3 --version
@@ -31,7 +31,7 @@ winget install Python.Python.3.13
 
 * **macOS:**
 * Using [Homebrew](https://brew.sh/):
-```bash
+```
 brew update && brew install python
 
 ```
@@ -41,7 +41,7 @@ brew update && brew install python
 
 
 * **Linux (Ubuntu / Debian):**
-```bash
+```
 sudo apt update && sudo apt install python3 python3-pip python3-venv -y
 
 ```
@@ -54,7 +54,7 @@ sudo apt update && sudo apt install python3 python3-pip python3-venv -y
 
 ### 1. Clone the Repository
 
-```bash
+```
 git clone <your-repository-url>
 cd <your-repository-folder>
 
@@ -62,7 +62,7 @@ cd <your-repository-folder>
 
 ### 2. (Optional) Create a Virtual Environment
 
-```bash
+```
 python -m venv venv
 
 # Activate on Windows:
@@ -77,7 +77,7 @@ source venv/bin/activate
 
 Install all third-party dependencies (`pyfiglet`, `readchar`, `pygame`, and `rich`) using `pip`:
 
-```bash
+```
 pip install pyfiglet readchar pygame rich
 
 ```
@@ -103,7 +103,7 @@ MagicPolly/
 
 ### 5. Run the Game
 
-```bash
+```
 python Magicpolly.py
 for mac: python3 Magicpolly.py
 
