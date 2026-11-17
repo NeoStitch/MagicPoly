@@ -22,8 +22,7 @@ The Game of Life is a classic roll-and-move board game where players simulate a 
 * Players create a custom character profile within a limit of points (stats, name, etc.); these will be saved and checked throughout the whole game.
 
 ### 2. Turn Movement
-
-* A random amount of spaces the character will move, depending on a randomly generated number between 1 and 6.
+* Each turn a dice will be rolled, and depending on your luck and your feet stat, the amount of tiles you'll advance will be more or less.
 
 ### 3. Space Types & Event Pools
 
@@ -31,18 +30,21 @@ Spaces can be one of 6 types: Class, Accident, Shenanigans, Exam, Artifact, and 
 
 | Space Type | Effect Description |
 | --- | --- |
-| **Class** | Class will increase a certain attribute. |
-| **Accident** | Accident will test luck and stats. |
-| **Shenanigans** | Shenanigans a negative effect. |
+| **Class** | Class will increase a certain attribute, you can take a risk for getting more stats. |
+| **Accident** | Accident will test luck and stats to solve your errors. |
+| **Shenanigans** | Shenanigans a trick played by your classmates where you'll have to face them to save your stats. |
 | **Exam** | Exams will serve as turning points in the story, like finishing a semester. |
-| **Artifact** | Artifact a card that will be helpful. |
-| **MagicPoly** | MagicPoly a positive effect with a huge downside. |
+| **Artifact** | Artifact an object that will be helpful, it'll be stored in your backpack and . |
+| **MagicPoly** | MagicPoly a growth in all your stats. |
 
 * Different categories of events will be organized into distinct event decks/pools. Events are randomized encounters; if the event is fulfilled, Resolves in success or failure.
+  
+* 
 
-### 4. Skill Check Engine
+### 4. Skill Check Engine / Quick Time Events
 
-* When making a skill check, it'll be a comparison between the necessary skill and a limit decided by a randomly generated number between 1 and 6.
+* When making a skill check, it'll be a comparison between the necessary skill and a limit decided by a randomly generated number between 1 and 6.,
+* Some events may include quick time events by pressing keys quickly
 
 ---
 
